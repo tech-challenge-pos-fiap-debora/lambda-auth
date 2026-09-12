@@ -1,0 +1,5 @@
+aws_region   = "us-east-1"
+project_name = "tech-challenge"
+environment  = "prod"
+database_name = "techChallenge"
+jwt_expires_in = "1d"
