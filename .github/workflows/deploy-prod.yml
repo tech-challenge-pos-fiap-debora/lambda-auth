@@ -1,0 +1,73 @@
+name: Deploy Prod
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  TF_DIR: terraform/environments/prod
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    name: Build Lambda + Terraform apply
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Lambda bundle
+        run: npm run build
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # O bucket do state deriva do ID da conta, que muda a cada lab novo.
+      - name: Terraform init
+        run: ./scripts/tf-init.sh
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          TF_VAR_mongo_url: ${{ secrets.MONGO_URL }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          # Vazio desativa a layer, mantendo a função operante sem telemetria.
+          TF_VAR_new_relic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
+          TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: terraform apply -auto-approve -input=false
+
+      - name: Export outputs
+        id: tf
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          echo "api_gateway_url=$(terraform output -raw api_gateway_url)" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test auth/login
+        run: |
+          API_URL="${{ steps.tf.outputs.api_gateway_url }}"
+          echo "API Gateway: ${API_URL}"
+          curl -fsS -X POST "${API_URL}/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"cpf":"00000000000"}' \
+            -w "\nHTTP %{http_code}\n" || true

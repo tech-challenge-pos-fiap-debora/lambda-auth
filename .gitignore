@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.zip
+.terraform/
+*.tfstate
+*.tfstate.*
+errored.tfstate*
+terraform.tfvars
+.env
