@@ -1,10 +1,15 @@
+import { randomUUID } from 'node:crypto';
 import { cpf } from 'cpf-cnpj-validator';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { MongoClient, type Document } from 'mongodb';
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
+  Context,
 } from 'aws-lambda';
+import { log } from './logger';
+
+const CORRELATION_ID_HEADER = 'x-request-id';
 
 type ClientDocument = Document & {
   _id: string;
@@ -21,10 +26,14 @@ let cachedClient: MongoClient | null = null;
 function jsonResponse(
   statusCode: number,
   body: unknown,
+  correlationId?: string,
 ): APIGatewayProxyResultV2 {
   return {
     statusCode,
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(correlationId ? { [CORRELATION_ID_HEADER]: correlationId } : {}),
+    },
     body: JSON.stringify(body),
   };
 }
@@ -62,9 +71,19 @@ function getDatabaseName(): string {
 
 export async function handler(
   event: APIGatewayProxyEventV2,
+  context?: Context,
 ): Promise<APIGatewayProxyResultV2> {
+  // Reaproveita o id enviado pelo cliente quando existir, para que o login e as
+  // chamadas seguintes à API compartilhem o mesmo identificador de correlação.
+  const correlationId =
+    event.headers?.[CORRELATION_ID_HEADER] ??
+    context?.awsRequestId ??
+    randomUUID();
+
+  const startedAt = Date.now();
+
   if (event.requestContext.http.method !== 'POST') {
-    return jsonResponse(405, { message: 'Method not allowed' });
+    return jsonResponse(405, { message: 'Method not allowed' }, correlationId);
   }
 
   try {
@@ -72,11 +91,13 @@ export async function handler(
     const digits = normalizeCpf(body.cpf ?? '');
 
     if (!digits) {
-      return jsonResponse(400, { message: 'CPF é obrigatório' });
+      log('warn', 'auth/login recusado', { correlationId, reason: 'cpf_ausente' });
+      return jsonResponse(400, { message: 'CPF é obrigatório' }, correlationId);
     }
 
     if (!cpf.isValid(digits)) {
-      return jsonResponse(400, { message: 'CPF inválido' });
+      log('warn', 'auth/login recusado', { correlationId, reason: 'cpf_invalido' });
+      return jsonResponse(400, { message: 'CPF inválido' }, correlationId);
     }
 
     const mongo = await getMongoClient();
@@ -86,7 +107,15 @@ export async function handler(
       .findOne({ document: digits });
 
     if (!clientDoc) {
-      return jsonResponse(401, { message: 'Cliente não encontrado' });
+      log('warn', 'auth/login recusado', {
+        correlationId,
+        reason: 'cliente_nao_encontrado',
+      });
+      return jsonResponse(
+        401,
+        { message: 'Cliente não encontrado' },
+        correlationId,
+      );
     }
 
     const secret = process.env.JWT_SECRET;
@@ -94,7 +123,8 @@ export async function handler(
       throw new Error('JWT_SECRET is not set');
     }
 
-    const expiresIn = (process.env.JWT_EXPIRES_IN ?? '1d') as SignOptions['expiresIn'];
+    const expiresIn = (process.env.JWT_EXPIRES_IN ??
+      '1d') as SignOptions['expiresIn'];
     const access_token = jwt.sign(
       {
         sub: clientDoc._id,
@@ -105,9 +135,20 @@ export async function handler(
       { expiresIn },
     );
 
-    return jsonResponse(200, { access_token });
+    log('info', 'auth/login autorizado', {
+      correlationId,
+      clientId: clientDoc._id,
+      durationMs: Date.now() - startedAt,
+    });
+
+    return jsonResponse(200, { access_token }, correlationId);
   } catch (error) {
-    console.error('auth/login failed', error);
-    return jsonResponse(500, { message: 'Erro interno' });
+    log('error', 'auth/login falhou', {
+      correlationId,
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return jsonResponse(500, { message: 'Erro interno' }, correlationId);
   }
 }

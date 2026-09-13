@@ -32,3 +32,16 @@ variable "jwt_secret" {
   type      = string
   sensitive = true
 }
+
+variable "new_relic_account_id" {
+  description = "Account ID do New Relic. Vazio desabilita a instrumentacao."
+  type        = string
+  default     = ""
+}
+
+variable "new_relic_license_key" {
+  description = "Ingest license key usada pela extensao do New Relic."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

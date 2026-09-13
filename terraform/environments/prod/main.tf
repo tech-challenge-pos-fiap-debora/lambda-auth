@@ -40,4 +40,7 @@ module "auth" {
   jwt_secret         = var.jwt_secret
   jwt_expires_in     = var.jwt_expires_in
   database_name      = var.database_name
+
+  new_relic_account_id  = var.new_relic_account_id
+  new_relic_license_key = var.new_relic_license_key
 }

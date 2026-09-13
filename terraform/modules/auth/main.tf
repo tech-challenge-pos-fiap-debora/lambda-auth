@@ -1,5 +1,29 @@
 locals {
   name = "${var.project_name}-${var.environment}-auth"
+
+  new_relic_enabled = var.new_relic_license_key != ""
+
+  # A layer assume o entrypoint: ela inicializa o agente e em seguida invoca o
+  # handler original, informado em NEW_RELIC_LAMBDA_HANDLER.
+  lambda_handler = local.new_relic_enabled ? "newrelic-lambda-wrapper.handler" : "handler.handler"
+
+  base_environment = {
+    MONGO_URL      = var.mongo_url
+    JWT_SECRET     = var.jwt_secret
+    JWT_EXPIRES_IN = var.jwt_expires_in
+    DATABASE_NAME  = var.database_name
+    DOCDB_CA_FILE  = "/var/task/certs/rds-combined-ca-bundle.pem"
+  }
+
+  new_relic_environment = local.new_relic_enabled ? {
+    NEW_RELIC_LAMBDA_HANDLER               = "handler.handler"
+    NEW_RELIC_ACCOUNT_ID                   = var.new_relic_account_id
+    NEW_RELIC_TRUSTED_ACCOUNT_KEY          = var.new_relic_account_id
+    NEW_RELIC_LICENSE_KEY                  = var.new_relic_license_key
+    NEW_RELIC_APP_NAME                     = var.new_relic_app_name
+    NEW_RELIC_DISTRIBUTED_TRACING_ENABLED  = "true"
+    NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS = "true"
+  } : {}
 }
 
 data "archive_file" "lambda" {
@@ -39,10 +63,12 @@ resource "aws_cloudwatch_log_group" "lambda" {
 resource "aws_lambda_function" "auth" {
   function_name = local.name
   role          = data.aws_iam_role.lab.arn
-  handler       = "handler.handler"
+  handler       = local.lambda_handler
   runtime       = "nodejs20.x"
   timeout       = 15
   memory_size   = 256
+
+  layers = local.new_relic_enabled ? [var.new_relic_layer_arn] : []
 
   filename         = data.archive_file.lambda.output_path
   source_code_hash = data.archive_file.lambda.output_base64sha256
@@ -53,13 +79,7 @@ resource "aws_lambda_function" "auth" {
   }
 
   environment {
-    variables = {
-      MONGO_URL      = var.mongo_url
-      JWT_SECRET     = var.jwt_secret
-      JWT_EXPIRES_IN = var.jwt_expires_in
-      DATABASE_NAME  = var.database_name
-      DOCDB_CA_FILE  = "/var/task/certs/rds-combined-ca-bundle.pem"
-    }
+    variables = merge(local.base_environment, local.new_relic_environment)
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda]
