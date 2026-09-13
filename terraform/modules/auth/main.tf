@@ -8,29 +8,11 @@ data "archive_file" "lambda" {
   output_path = abspath("${path.module}/../../../dist/lambda.zip")
 }
 
-resource "aws_iam_role" "lambda" {
-  name = "${local.name}-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
-
-  tags = var.tags
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_vpc" {
-  role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+# O AWS Academy Learner Lab nega iam:CreateRole. A LabRole pre-existente confia em
+# lambda.amazonaws.com e ja carrega as permissoes de CloudWatch Logs e de ENI em VPC
+# que os policies AWSLambdaBasicExecutionRole e AWSLambdaVPCAccessExecutionRole davam.
+data "aws_iam_role" "lab" {
+  name = "LabRole"
 }
 
 resource "aws_security_group" "lambda" {
@@ -56,7 +38,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
 
 resource "aws_lambda_function" "auth" {
   function_name = local.name
-  role          = aws_iam_role.lambda.arn
+  role          = data.aws_iam_role.lab.arn
   handler       = "handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 15
@@ -80,11 +62,7 @@ resource "aws_lambda_function" "auth" {
     }
   }
 
-  depends_on = [
-    aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_vpc,
-    aws_cloudwatch_log_group.lambda,
-  ]
+  depends_on = [aws_cloudwatch_log_group.lambda]
 
   tags = var.tags
 }

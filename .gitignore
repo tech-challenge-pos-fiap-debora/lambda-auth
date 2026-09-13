@@ -4,7 +4,6 @@ dist/
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
-backend.hcl
+errored.tfstate*
 terraform.tfvars
 .env
