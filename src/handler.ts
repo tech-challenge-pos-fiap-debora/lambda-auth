@@ -15,6 +15,7 @@ type ClientDocument = Document & {
   _id: string;
   email: string;
   document: string;
+  status?: string;
 };
 
 type LoginBody = {
@@ -116,6 +117,14 @@ export async function handler(
         { message: 'Cliente não encontrado' },
         correlationId,
       );
+    }
+
+    if ((clientDoc.status ?? 'ACTIVE') !== 'ACTIVE') {
+      log('warn', 'auth/login recusado', {
+        correlationId,
+        reason: 'cliente_inativo',
+      });
+      return jsonResponse(403, { message: 'Cliente inativo' }, correlationId);
     }
 
     const secret = process.env.JWT_SECRET;
