@@ -67,7 +67,12 @@ jobs:
         run: |
           API_URL="${{ steps.tf.outputs.api_gateway_url }}"
           echo "API Gateway: ${API_URL}"
-          curl -fsS -X POST "${API_URL}/auth/login" \
+          HTTP_CODE=$(curl -sS -o /tmp/login.json -w "%{http_code}" -X POST "${API_URL}/auth/login" \
             -H "Content-Type: application/json" \
-            -d '{"cpf":"00000000000"}' \
-            -w "\nHTTP %{http_code}\n" || true
+            -d '{"cpf":"52998224725"}')
+          cat /tmp/login.json
+          echo "HTTP ${HTTP_CODE}"
+          case "${HTTP_CODE}" in
+            200|401|404) echo "Endpoint respondeu (Lambda + API Gateway OK)" ;;
+            *) exit 1 ;;
+          esac
