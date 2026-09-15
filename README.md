@@ -39,6 +39,13 @@ terraform apply
 
 Push na `main` roda [`Deploy Prod`](.github/workflows/deploy-prod.yml): build, `terraform apply`, smoke `POST /auth/login`.
 
+## Ordem de deploy
+
+1. infra-database
+2. infra-kubernetes
+3. app
+4. lambda-auth
+
 ## Pipeline
 
 | Workflow | Gatilho | O que faz |

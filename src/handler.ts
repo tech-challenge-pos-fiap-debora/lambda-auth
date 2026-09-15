@@ -45,6 +45,8 @@ export async function handler(
   event: APIGatewayProxyEventV2,
   context?: Context,
 ): Promise<APIGatewayProxyResultV2> {
+  // Reaproveita o id enviado pelo cliente quando existir, para que o login e as
+  // chamadas seguintes à API compartilhem o mesmo identificador de correlação.
   const correlationId =
     event.headers?.[CORRELATION_ID_HEADER] ??
     context?.awsRequestId ??
