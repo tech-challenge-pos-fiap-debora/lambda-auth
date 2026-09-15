@@ -54,6 +54,9 @@ resource "aws_security_group" "lambda" {
 
   lifecycle {
     create_before_destroy = true
+    # A description antiga ("DocumentDB") difere da atual; trocar força replace
+    # com o mesmo name e falha com InvalidGroup.Duplicate no lab.
+    ignore_changes = [description]
   }
 }
 
