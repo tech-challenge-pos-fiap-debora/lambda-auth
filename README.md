@@ -76,11 +76,17 @@ sequenceDiagram
     end
 ```
 
+## Deploy ativo (produção)
+
+- API Gateway: `POST` https://b831ifscuh.execute-api.us-east-1.amazonaws.com/prod/auth/login
+- CPF de demonstração (cliente `ACTIVE` no seed): `52998224725`
+- API protegida / Swagger: http://k8s-techchal-api-3be88fc582-917637512.us-east-1.elb.amazonaws.com/api
+
 ## APIs
 
 - Contrato: `POST /auth/login` `{ "cpf": "52998224725" }` → `{ "access_token": "..." }`
 - Header de correlação: envie e receba `x-request-id`
-- A API protegida e o Swagger ficam no `app`: http://localhost:3000/api
+- Sem token nas rotas internas da API: `401`. Com JWT de `role=cliente` em rota de equipe: `403` (token válido, papel insuficiente).
 
 ```bash
 API_URL=$(terraform -chdir=terraform/environments/prod output -raw api_gateway_url)
