@@ -1,5 +1,18 @@
 # lambda-auth — autenticação por CPF
 
+Function serverless da Fase 3. O avaliador testa assim:
+
+```bash
+curl -X POST https://b831ifscuh.execute-api.us-east-1.amazonaws.com/prod/auth/login \
+  -H "Content-Type: application/json" \
+  -H "x-request-id: avaliacao-1" \
+  -d '{"cpf":"52998224725"}'
+```
+
+Resposta esperada: `200` e `{ "access_token": "..." }`. CPF inválido → `400`. Cliente inexistente → `401`. Inativo → `403`.
+
+A API da oficina (Swagger) **não** está neste repo: http://k8s-techchal-api-3be88fc582-917637512.us-east-1.elb.amazonaws.com/api
+
 ## Propósito
 
 Function serverless que autentica o cliente da oficina. Expõe `POST /auth/login` no API Gateway HTTP: valida o CPF, consulta existência e status na tabela `client` do **RDS PostgreSQL** e devolve um JWT que a API NestJS aceita.
