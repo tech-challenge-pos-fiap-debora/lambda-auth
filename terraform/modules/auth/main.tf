@@ -9,6 +9,7 @@ locals {
 
   base_environment = {
     DATABASE_URL   = var.database_url
+    PGSSL          = "true"
     JWT_SECRET     = var.jwt_secret
     JWT_EXPIRES_IN = var.jwt_expires_in
   }
@@ -50,6 +51,10 @@ resource "aws_security_group" "lambda" {
   }
 
   tags = merge(var.tags, { Name = "${local.name}-sg" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
