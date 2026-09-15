@@ -11,7 +11,7 @@ rmSync(dist, { recursive: true, force: true });
 mkdirSync(certsDir, { recursive: true });
 
 execSync(
-  'npx esbuild src/handler.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/handler.js --external:@aws-sdk/*',
+  'npx esbuild src/handler.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/handler.js --external:@aws-sdk/* --external:pg',
   { cwd: root, stdio: 'inherit' },
 );
 

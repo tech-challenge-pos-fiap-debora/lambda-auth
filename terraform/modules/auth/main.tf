@@ -8,11 +8,9 @@ locals {
   lambda_handler = local.new_relic_enabled ? "newrelic-lambda-wrapper.handler" : "handler.handler"
 
   base_environment = {
-    MONGO_URL      = var.mongo_url
+    DATABASE_URL   = var.database_url
     JWT_SECRET     = var.jwt_secret
     JWT_EXPIRES_IN = var.jwt_expires_in
-    DATABASE_NAME  = var.database_name
-    DOCDB_CA_FILE  = "/var/task/certs/rds-combined-ca-bundle.pem"
   }
 
   new_relic_environment = local.new_relic_enabled ? {
@@ -41,7 +39,7 @@ data "aws_iam_role" "lab" {
 
 resource "aws_security_group" "lambda" {
   name        = "${local.name}-sg"
-  description = "Lambda auth access to DocumentDB"
+  description = "Lambda auth access to RDS PostgreSQL"
   vpc_id      = var.vpc_id
 
   egress {

@@ -1,27 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import { cpf } from 'cpf-cnpj-validator';
 import jwt, { type SignOptions } from 'jsonwebtoken';
-import { MongoClient, type Document } from 'mongodb';
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyResultV2,
   Context,
 } from 'aws-lambda';
+import { getPool } from './db';
 import { log } from './logger';
 
 const CORRELATION_ID_HEADER = 'x-request-id';
 
-type ClientDocument = Document & {
-  _id: string;
+type ClientRow = {
+  id: string;
   email: string;
   document: string;
+  status: string;
 };
 
 type LoginBody = {
   cpf?: string;
 };
-
-let cachedClient: MongoClient | null = null;
 
 function jsonResponse(
   statusCode: number,
@@ -40,33 +39,6 @@ function jsonResponse(
 
 function normalizeCpf(raw: string): string {
   return raw.replace(/\D/g, '');
-}
-
-async function getMongoClient(): Promise<MongoClient> {
-  if (cachedClient) {
-    return cachedClient;
-  }
-
-  const uri = process.env.MONGO_URL;
-  if (!uri) {
-    throw new Error('MONGO_URL is not set');
-  }
-
-  const caFile =
-    process.env.DOCDB_CA_FILE ?? '/var/task/certs/rds-combined-ca-bundle.pem';
-
-  cachedClient = new MongoClient(uri, {
-    tls: true,
-    tlsCAFile: caFile,
-    serverSelectionTimeoutMS: 5000,
-  });
-
-  await cachedClient.connect();
-  return cachedClient;
-}
-
-function getDatabaseName(): string {
-  return process.env.DATABASE_NAME ?? 'techChallenge';
 }
 
 export async function handler(
@@ -100,13 +72,17 @@ export async function handler(
       return jsonResponse(400, { message: 'CPF inválido' }, correlationId);
     }
 
-    const mongo = await getMongoClient();
-    const clientDoc = await mongo
-      .db(getDatabaseName())
-      .collection<ClientDocument>('client')
-      .findOne({ document: digits });
+    const result = await getPool().query<ClientRow>(
+      `SELECT id, email, document, status
+       FROM client
+       WHERE document = $1
+       LIMIT 1`,
+      [digits],
+    );
 
-    if (!clientDoc) {
+    const clientRow = result.rows[0];
+
+    if (!clientRow) {
       log('warn', 'auth/login recusado', {
         correlationId,
         reason: 'cliente_nao_encontrado',
@@ -118,6 +94,14 @@ export async function handler(
       );
     }
 
+    if (clientRow.status !== 'ACTIVE') {
+      log('warn', 'auth/login recusado', {
+        correlationId,
+        reason: 'cliente_inativo',
+      });
+      return jsonResponse(403, { message: 'Cliente inativo' }, correlationId);
+    }
+
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       throw new Error('JWT_SECRET is not set');
@@ -127,8 +111,8 @@ export async function handler(
       '1d') as SignOptions['expiresIn'];
     const access_token = jwt.sign(
       {
-        sub: clientDoc._id,
-        email: clientDoc.email,
+        sub: clientRow.id,
+        email: clientRow.email,
         role: 'cliente',
       },
       secret,
@@ -137,7 +121,7 @@ export async function handler(
 
     log('info', 'auth/login autorizado', {
       correlationId,
-      clientId: clientDoc._id,
+      clientId: clientRow.id,
       durationMs: Date.now() - startedAt,
     });
 

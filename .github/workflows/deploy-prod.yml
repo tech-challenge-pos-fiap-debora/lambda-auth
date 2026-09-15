@@ -50,9 +50,9 @@ jobs:
       - name: Terraform apply
         working-directory: ${{ env.TF_DIR }}
         env:
-          TF_VAR_mongo_url: ${{ secrets.MONGO_URL }}
+          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
           TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
-          # Vazio desativa a layer, mantendo a função operante sem telemetria.
+          # Vazio desabilita a layer, mantendo a função operante sem telemetria.
           TF_VAR_new_relic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
           TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
         run: terraform apply -auto-approve -input=false

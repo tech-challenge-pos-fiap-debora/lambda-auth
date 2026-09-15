@@ -18,7 +18,7 @@ variable "private_subnet_ids" {
   type = list(string)
 }
 
-variable "mongo_url" {
+variable "database_url" {
   type      = string
   sensitive = true
 }
@@ -31,11 +31,6 @@ variable "jwt_secret" {
 variable "jwt_expires_in" {
   type    = string
   default = "1d"
-}
-
-variable "database_name" {
-  type    = string
-  default = "techChallenge"
 }
 
 variable "new_relic_account_id" {
