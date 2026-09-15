@@ -13,17 +13,12 @@ variable "environment" {
   default = "prod"
 }
 
-variable "database_name" {
-  type    = string
-  default = "techChallenge"
-}
-
 variable "jwt_expires_in" {
   type    = string
   default = "1d"
 }
 
-variable "mongo_url" {
+variable "database_url" {
   type      = string
   sensitive = true
 }

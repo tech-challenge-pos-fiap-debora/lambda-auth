@@ -36,10 +36,9 @@ module "auth" {
   tags               = local.common_tags
   vpc_id             = data.aws_vpc.this.id
   private_subnet_ids = data.aws_subnets.private.ids
-  mongo_url          = var.mongo_url
+  database_url       = var.database_url
   jwt_secret         = var.jwt_secret
   jwt_expires_in     = var.jwt_expires_in
-  database_name      = var.database_name
 
   new_relic_account_id  = var.new_relic_account_id
   new_relic_license_key = var.new_relic_license_key
