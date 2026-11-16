@@ -6,7 +6,6 @@ import type {
   APIGatewayProxyResultV2,
   Context,
 } from 'aws-lambda';
-import { getPool } from './db';
 import { log } from './logger';
 
 const CORRELATION_ID_HEADER = 'x-request-id';
@@ -41,6 +40,33 @@ function normalizeCpf(raw: string): string {
   return raw.replace(/\D/g, '');
 }
 
+async function fetchClientByDocument(
+  baseUrl: string,
+  document: string,
+  correlationId: string,
+): Promise<{ status: number; client: ClientRow | null }> {
+  const url = `${baseUrl.replace(/\/$/, '')}/client/by-document/${encodeURIComponent(document)}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      [CORRELATION_ID_HEADER]: correlationId,
+    },
+  });
+
+  if (res.status === 404) {
+    return { status: 404, client: null };
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`identity ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  const client = (await res.json()) as ClientRow;
+  return { status: 200, client };
+}
+
 export async function handler(
   event: APIGatewayProxyEventV2,
   context?: Context,
@@ -72,17 +98,18 @@ export async function handler(
       return jsonResponse(400, { message: 'CPF inválido' }, correlationId);
     }
 
-    const result = await getPool().query<ClientRow>(
-      `SELECT id, email, document, status
-       FROM client
-       WHERE document = $1
-       LIMIT 1`,
-      [digits],
+    const identityBaseUrl = process.env.IDENTITY_BASE_URL?.trim();
+    if (!identityBaseUrl) {
+      throw new Error('IDENTITY_BASE_URL is not set');
+    }
+
+    const { status, client: clientRow } = await fetchClientByDocument(
+      identityBaseUrl,
+      digits,
+      correlationId,
     );
 
-    const clientRow = result.rows[0];
-
-    if (!clientRow) {
+    if (status === 404 || !clientRow) {
       log('warn', 'auth/login recusado', {
         correlationId,
         reason: 'cliente_nao_encontrado',

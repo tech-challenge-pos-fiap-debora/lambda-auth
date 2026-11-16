@@ -15,13 +15,13 @@ A API da oficina (Swagger) **não** está neste repo: http://k8s-techchal-api-3b
 
 ## Propósito
 
-Function serverless que autentica o cliente da oficina. Expõe `POST /auth/login` no API Gateway HTTP: valida o CPF, consulta existência e status na tabela `client` do **RDS PostgreSQL** e devolve um JWT que a API NestJS aceita.
+Function serverless que autentica o **cliente** da oficina (CPF). Expõe `POST /auth/login` no API Gateway HTTP: valida o CPF, consulta o **identity-service** (`GET /client/by-document/:cpf`) e devolve um JWT (`role: cliente`). Login de funcionários fica no identity (`POST /auth/login` email+senha via ALB).
 
 ## Tecnologias
 
 - Node.js 20, TypeScript, esbuild
 - AWS Lambda + API Gateway HTTP (v2)
-- Driver `pg` (PostgreSQL)
+- HTTP para o identity-service (`IDENTITY_BASE_URL`)
 - `cpf-cnpj-validator`, `jsonwebtoken`
 - Terraform >= 1.5
 - Layer New Relic (quando a license key existe)
@@ -30,12 +30,11 @@ Não há Dockerfile: o artefato é zip de `dist/`, runtime `nodejs20.x`.
 
 ## Pré-requisitos
 
-1. `infra-database` aplicado (RDS na VPC)
-2. `infra-kubernetes` aplicado (VPC e subnets privadas)
-3. GitHub Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `DATABASE_URL`, `JWT_SECRET`
-4. Opcionais: `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_ACCOUNT_ID`
+1. `infra-kubernetes` com identity no ALB (`/identity`)
+2. GitHub Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `IDENTITY_BASE_URL` (ex. `http://<alb-dns>/identity`), `JWT_SECRET`
+3. Opcionais: `NEW_RELIC_LICENSE_KEY`, `NEW_RELIC_ACCOUNT_ID`
 
-O `JWT_SECRET` tem de ser o mesmo do Deployment da API. Payload: `sub` = `id` do cliente, `email`, `role: "cliente"`.
+O `JWT_SECRET` tem de ser o mesmo do identity/MS. Payload: `sub` = `id` do cliente, `email`, `role: "cliente"`.
 
 ## Execução
 
@@ -54,9 +53,9 @@ Push na `main` roda [`Deploy Prod`](.github/workflows/deploy-prod.yml): build, `
 
 ## Ordem de deploy
 
-1. infra-database
-2. infra-kubernetes
-3. app
+1. infra-database (+ databases MS)
+2. infra-kubernetes (MS + SNS/SQS)
+3. identity-service no EKS
 4. lambda-auth
 
 ## Pipeline
@@ -73,13 +72,13 @@ A `main` é protegida.
 ```mermaid
 sequenceDiagram
     actor Cliente
-    participant GW as API Gateway
+    participant GW as API_Gateway
     participant FN as Lambda
-    participant DB as RDS client
+    participant ID as identity_service
     Cliente->>GW: POST /auth/login { cpf }
     GW->>FN: AWS_PROXY
     FN->>FN: valida CPF
-    FN->>DB: SELECT WHERE document = cpf
+    FN->>ID: GET /client/by-document/{cpf}
     alt ACTIVE
         FN-->>Cliente: 200 { access_token }
     else INACTIVE

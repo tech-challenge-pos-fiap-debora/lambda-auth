@@ -36,7 +36,7 @@ module "auth" {
   tags               = local.common_tags
   vpc_id             = data.aws_vpc.this.id
   private_subnet_ids = data.aws_subnets.private.ids
-  database_url       = var.database_url
+  identity_base_url  = var.identity_base_url
   jwt_secret         = var.jwt_secret
   jwt_expires_in     = var.jwt_expires_in
 

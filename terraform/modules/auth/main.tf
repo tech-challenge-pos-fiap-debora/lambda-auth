@@ -8,10 +8,9 @@ locals {
   lambda_handler = local.new_relic_enabled ? "newrelic-lambda-wrapper.handler" : "handler.handler"
 
   base_environment = {
-    DATABASE_URL   = var.database_url
-    PGSSL          = "true"
-    JWT_SECRET     = var.jwt_secret
-    JWT_EXPIRES_IN = var.jwt_expires_in
+    IDENTITY_BASE_URL = var.identity_base_url
+    JWT_SECRET        = var.jwt_secret
+    JWT_EXPIRES_IN    = var.jwt_expires_in
   }
 
   new_relic_environment = local.new_relic_enabled ? {
@@ -40,7 +39,7 @@ data "aws_iam_role" "lab" {
 
 resource "aws_security_group" "lambda" {
   name        = "${local.name}-sg"
-  description = "Lambda auth access to RDS PostgreSQL"
+  description = "Lambda auth egress to identity via ALB/NAT"
   vpc_id      = var.vpc_id
 
   egress {

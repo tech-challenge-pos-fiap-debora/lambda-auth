@@ -18,9 +18,9 @@ variable "private_subnet_ids" {
   type = list(string)
 }
 
-variable "database_url" {
-  type      = string
-  sensitive = true
+variable "identity_base_url" {
+  description = "Base HTTP do identity no ALB, ex.: http://k8s-...elb.amazonaws.com/identity"
+  type        = string
 }
 
 variable "jwt_secret" {
