@@ -52,10 +52,25 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         run: terraform validate
 
+      # Plan precisa da VPC do infra-kubernetes (tags Project/Environment).
+      - name: Check VPC
+        id: vpc
+        run: |
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters Name=tag:Project,Values=tech-challenge Name=tag:Environment,Values=prod \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
+          if [[ "$VPC_ID" == vpc-* ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "VPC tech-challenge/prod ausente — pulando plan (rode infra-kubernetes antes)."
+          fi
+
       - name: Terraform plan
+        if: steps.vpc.outputs.exists == 'true'
         working-directory: ${{ env.TF_DIR }}
         env:
-          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_identity_base_url: ${{ secrets.IDENTITY_BASE_URL }}
           TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
           TF_VAR_new_relic_account_id: ${{ secrets.NEW_RELIC_ACCOUNT_ID }}
           TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}

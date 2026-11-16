@@ -18,9 +18,9 @@ variable "jwt_expires_in" {
   default = "1d"
 }
 
-variable "database_url" {
-  type      = string
-  sensitive = true
+variable "identity_base_url" {
+  description = "Base HTTP do identity no ALB (com path /identity)."
+  type        = string
 }
 
 variable "jwt_secret" {
