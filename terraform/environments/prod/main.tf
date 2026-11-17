@@ -26,6 +26,13 @@ data "aws_subnets" "private" {
   tags = {
     "kubernetes.io/role/internal-elb" = "1"
   }
+
+  lifecycle {
+    postcondition {
+      condition     = length(self.ids) > 0
+      error_message = "Nenhuma subnet privada encontrada na VPC do lab. Rode o Deploy Prod do infra-kubernetes antes."
+    }
+  }
 }
 
 module "auth" {

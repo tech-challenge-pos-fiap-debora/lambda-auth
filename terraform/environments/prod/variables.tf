@@ -21,6 +21,11 @@ variable "jwt_expires_in" {
 variable "identity_base_url" {
   description = "Base HTTP do identity no ALB (com path /identity)."
   type        = string
+
+  validation {
+    condition     = can(regex("^https?://", var.identity_base_url))
+    error_message = "identity_base_url vazio ou inválido. Configure o secret IDENTITY_BASE_URL com o DNS do ALB."
+  }
 }
 
 variable "jwt_secret" {
